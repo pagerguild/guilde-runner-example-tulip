@@ -1,0 +1,1708 @@
+# Purpose: Simplified Shift-Left SDLC workflow with TDD and early QA integration
+# Agents: PM, Architect, Tech Lead, Scrum Master, IT Admin, QA Engineer, Development, Review, Documentation
+# Flow: Requirements → Architecture → Implementation → Stories → Environment Setup → QA/TDD Ping-Pong → Review → Documentation
+# Architecture: Inspired by beta-workflow's simplicity, maintains shift-left quality principles with tight QA-TDD feedback loops
+
+id: test-driven-development
+name: Test-Driven Development Workflow
+description: |
+  Simplified shift-left SDLC workflow focused on test-driven development with early QA integration.
+  Uses specialized agents with clear separation of concerns for efficient sprint execution.
+
+  Key features:
+  - Separated planning phases (PM, Architect, Tech Lead, Scrum Master)
+  - Scrum Master creates stories after full technical understanding
+  - Individual story files with zero-padded naming for clarity
+  - QA Engineer enhances stories with test specifications (ping-pong with TDD)
+  - Graduated detail approach: QA notes match story complexity
+  - Strict TDD with RED-GREEN-REFACTOR cycles
+  - TODO list for incremental story processing with minimal handoffs
+  - Tight feedback loops between quality thinking and implementation
+  - Documentation updates based on code changes
+  - Simple feedback loop via inbox folder
+  - Flat file organization in sprint folder
+  - Resume capability via SPRINT_STATUS.md checkpoints
+
+default_model: anthropic/claude-sonnet-4-5-20250929
+# Validate dependencies before workflow execution
+init:
+  sequential: true
+  failure_message: |
+    Required dependencies not found. Please ensure:
+    - Git is installed and repository initialized
+    - Sprint path provided or default ./docs/sprints/ directory exists
+
+  commands:
+    - run: git --version
+      name: verify git available
+      timeout: "10s"
+    - run: test -d .git || (echo "Not a git repository" && exit 1)
+      name: verify git repository
+      timeout: "5s"
+
+steps:
+  # PHASE 1: PLANNING - Split into PM, Architect, and Tech Lead
+
+  # PHASE 1.1: Project Manager - Requirements Gathering
+  - id: pm
+    name: Requirements Gathering (PM)
+    description: Gather requirements through iterative questioning
+    agent: tdd-01-pm
+    allow_feedback: true
+    models:
+      - anthropic/claude-sonnet-4-5-20250929
+
+    prompt: |
+      # PM Workflow Task: Requirements Gathering for Sprint {{.Args.SprintID}}
+
+      ## Your Task
+
+      Gather and document requirements for this sprint through iterative questioning.
+
+      ## Sprint Context
+
+      - **Sprint plan directory**: {{.Args.SprintPlanDir}}
+      - **Sprint ID**: {{.Args.SprintID}}
+      - **Sprint objective file**: {{.Args.SprintPlanPath}}
+
+      ## Task Steps
+
+      ### Step 1: Git Repository Setup
+
+      Take ownership of git repository to enable commits:
+
+      ```bash
+      sudo chown -R $(whoami):$(whoami) . .git
+      ```
+
+      Verify git repository is accessible and ready for commits.
+
+      ### Step 2: Sprint Folder and Objective Setup
+
+      **If sprint objective file DOES NOT EXIST** ({{.Args.SprintPlanPath}}):
+
+      1. Create sprint folder at {{.Args.SprintPlanDir}} if it doesn't exist
+      2. Create empty sprint objective file: {{.Args.SprintPlanPath}}
+      3. Ask user: "What would you like to build in this sprint?"
+      4. Wait for user response
+      5. Write user's response to sprint objective file
+
+      **If sprint objective file EXISTS**:
+
+      1. Read existing sprint objective from {{.Args.SprintPlanPath}}
+      2. Verify it contains content
+      3. Use this existing objective for sprint planning
+
+      ### Step 3: Complexity Assessment
+
+      1. Read the sprint objective
+      2. Research relevant codebase areas to understand integration points and existing patterns
+      3. Make initial complexity assessment (Easy/Medium/Hard)
+      4. Use this assessment to determine questioning depth
+
+      ### Step 4: Requirements Gathering
+
+      1. Ask clarifying questions based on your complexity-driven methodology
+      2. Gather information across all relevant question categories
+      3. Document all questions and answers received
+
+      ### Step 5: Document Requirements
+
+      Create {{.Args.SprintPlanDir}}/REQUIREMENTS.md with:
+
+      - Your complexity assessment and justification
+      - All standard requirements sections (IN-scope, OUT-of-scope, success criteria, risks, dependencies)
+      - Q&A appendix with all questions asked and answers received
+
+      ### Step 6: Commit Requirements
+
+      Commit the REQUIREMENTS.md file with this message format:
+
+      ```
+      feat(sprint-{{.Args.SprintID}}): [Guilde] Add requirements documentation
+      ```
+
+      Include a detailed commit body following the pattern from recent commits.
+
+      ## Success Criteria
+
+      - Sprint objective is captured or created
+      - Requirements document is complete with all required sections
+      - Requirements are committed to the repository
+      - Ready to transition to Architect phase
+
+    transitions_to:
+      - to_state: architect
+        reason: Requirements complete, ready for architecture analysis
+
+  # PHASE 1.2: Architect - Architecture Analysis
+  - id: architect
+    name: Architecture Analysis (Architect)
+    description: Analyze codebase and identify integration patterns
+    agent: tdd-02-architect
+    
+    models:
+      - anthropic/claude-sonnet-4-5-20250929
+
+    files:
+      - path: "{{.Args.SprintPlanDir}}/REQUIREMENTS.md"
+        
+
+    prompt: |
+      # Architect Workflow Task: Architecture Analysis for Sprint {{.Args.SprintID}}
+
+      ## Your Task
+
+      Analyze the codebase and create architectural guidance for integrating the features described in the requirements document.
+
+      ## Sprint Context
+
+      - **Sprint plan directory**: {{.Args.SprintPlanDir}}
+      - **Sprint ID**: {{.Args.SprintID}}
+      - **Requirements file**: {{.Args.SprintPlanDir}}/REQUIREMENTS.md
+      - **Output file**: {{.Args.SprintPlanDir}}/ARCHITECTURE.md
+
+      ## Task Steps
+
+      ### Step 1: Read Requirements
+
+      Read the requirements document at {{.Args.SprintPlanDir}}/REQUIREMENTS.md:
+
+      1. Understand what needs to be built
+      2. Extract key features and integration needs
+      3. Identify which parts of the codebase are relevant to these requirements
+
+      ### Step 2: Analyze Relevant Codebase Areas
+
+      Use your focused codebase analysis methodology to explore:
+
+      - Project structure and organization patterns
+      - Existing design patterns used in relevant areas
+      - Integration points where new features will connect
+      - Test patterns and frameworks in similar features
+      - Configuration management approaches
+      - Error handling patterns
+
+      Apply your exploration techniques (Glob, Grep) to find relevant examples.
+
+      ### Step 3: Document Architecture
+
+      Create {{.Args.SprintPlanDir}}/ARCHITECTURE.md with your standard architecture documentation structure:
+
+      - Specific file paths and examples from the codebase
+      - Patterns to follow (with concrete examples)
+      - Conventions to maintain
+      - Test structure recommendations
+      - Integration guidance for connecting new code
+
+      Ensure all guidance is:
+
+      - Specific (file paths, line numbers)
+      - Grounded in existing code examples
+      - Focused on HOW to integrate, not WHAT to build
+      - Relevant to the requirements only
+
+      ### Step 4: Commit Architecture Documentation
+
+      Commit {{.Args.SprintPlanDir}}/ARCHITECTURE.md with this message format:
+
+      ```
+      feat(sprint-{{.Args.SprintID}}): [Guilde] Add architecture analysis
+      ```
+
+      Include a detailed commit body following the pattern from recent commits.
+
+      ## Success Criteria
+
+      - Architecture document is complete with specific file references
+      - All integration points are identified with examples
+      - Test structure guidance is provided
+      - Architecture is committed to the repository
+      - Ready to transition to Tech Lead phase
+
+    transitions_to:
+      - to_state: tech-lead
+        reason: Architecture complete, ready for story breakdown
+
+  # PHASE 1.3: Tech Lead - Implementation Report
+  - id: tech-lead
+    name: Implementation Report (Tech Lead)
+    description: Create comprehensive implementation report synthesizing PM and Architect outputs
+    agent: tdd-03-tech-lead
+    
+    models:
+      - anthropic/claude-sonnet-4-5-20250929
+
+    files:
+      - path: "{{.Args.SprintPlanDir}}/REQUIREMENTS.md"
+        
+      - path: "{{.Args.SprintPlanDir}}/ARCHITECTURE.md"
+        
+
+    prompt: |
+      # Tech Lead Workflow Task: Implementation Report for Sprint {{.Args.SprintID}}
+
+      ## Your Task
+
+      Synthesize requirements and architecture into a comprehensive implementation report that guides the Scrum Master in creating actionable user stories.
+
+      ## Sprint Context
+
+      - **Sprint plan directory**: {{.Args.SprintPlanDir}}
+      - **Sprint ID**: {{.Args.SprintID}}
+      - **Input files**:
+        - {{.Args.SprintPlanDir}}/REQUIREMENTS.md
+        - {{.Args.SprintPlanDir}}/ARCHITECTURE.md
+      - **Output files**:
+        - {{.Args.SprintPlanDir}}/IMPLEMENTATION.md
+        - {{.Args.SprintPlanDir}}/dependencies.yaml
+
+      ## Task Steps
+
+      ### Step 1: Read and Analyze Planning Documents
+
+      Read both input documents:
+
+      1. **REQUIREMENTS.md** at {{.Args.SprintPlanDir}}/REQUIREMENTS.md
+         - Extract complexity assessment (Easy/Medium/Hard)
+         - Understand business requirements and user needs
+         - Note success criteria and constraints
+         - Review acceptance criteria
+
+      2. **ARCHITECTURE.md** at {{.Args.SprintPlanDir}}/ARCHITECTURE.md
+         - Understand design patterns and component structure
+         - Review technical decisions and trade-offs
+         - Identify integration points and dependencies
+         - Note specific file paths and code examples
+
+      ### Step 2: Create Implementation Report
+
+      Create {{.Args.SprintPlanDir}}/IMPLEMENTATION.md using your standard implementation report template and structure:
+
+      **Required sections:**
+
+      - Overview (brief summary synthesizing requirements and architecture)
+      - Technical Approach (strategy, core patterns, integration approach)
+      - Component Breakdown (table format with responsibilities, dependencies, complexity)
+      - Development Sequence (foundation → core → features with dependency mapping)
+      - Technical Risks and Mitigations (identify risks with likelihood, impact, and mitigation)
+      - Testing Approach and Quality Criteria (testing strategy and quality standards)
+      - Story Preparation Guidance (complexity-driven story count, graduated detail, story principles)
+      - Success Criteria (acceptance criteria from requirements)
+
+      **Ensure:**
+
+      - Synthesis of both PM and Architect outputs (not duplication)
+      - Clear guidance for Scrum Master story creation
+      - Graduated detail level based on complexity assessment
+      - Helper functions and dependencies prioritized
+      - Vertical feature slices highlighted when feasible
+
+      ### Step 3: Identify Development Dependencies
+
+      Create {{.Args.SprintPlanDir}}/dependencies.yaml:
+
+      1. Analyze the requirements and architecture to understand technical needs
+      2. Identify all tools, runtimes, and frameworks needed for:
+         - Development
+         - Testing
+         - Building
+         - Running the implementation
+      3. List dependencies in YAML format, categorized by type
+
+      ### Step 4: Commit Implementation Report
+
+      Commit {{.Args.SprintPlanDir}}/IMPLEMENTATION.md with this message format:
+
+      ```
+      feat(sprint-{{.Args.SprintID}}): [Guilde] Create implementation report
+      ```
+
+      Include a detailed commit body following the pattern from recent commits.
+
+      ### Step 5: Commit Dependencies
+
+      Commit {{.Args.SprintPlanDir}}/dependencies.yaml with this message format:
+
+      ```
+      feat(sprint-{{.Args.SprintID}}): [Guilde] Add development dependencies
+      ```
+
+      Include a detailed commit body following the pattern from recent commits.
+
+      ## Success Criteria
+
+      - Implementation report is complete with all required sections
+      - Implementation report synthesizes (not duplicates) requirements and architecture
+      - Dependencies file lists all required development tools and frameworks
+      - Both files are committed to the repository
+      - Ready to transition to Scrum Master phase for story creation
+
+    transitions_to:
+      - to_state: scrum-master
+        reason: Implementation report complete, ready for story creation
+
+  # PHASE 1.4: Scrum Master - Story Creation
+  - id: scrum-master
+    name: Story Creation (Scrum Master)
+    description: Create well-formed user stories from implementation report
+    agent: tdd-04-scrum-master
+    
+    models:
+      - anthropic/claude-sonnet-4-5-20250929
+
+    files:
+      - path: "{{.Args.SprintPlanDir}}/REQUIREMENTS.md"
+        
+      - path: "{{.Args.SprintPlanDir}}/ARCHITECTURE.md"
+        
+      - path: "{{.Args.SprintPlanDir}}/IMPLEMENTATION.md"
+        
+
+    prompt: |
+      # Scrum Master Workflow Task: Story Creation for Sprint {{.Args.SprintID}}
+
+      ## Your Task
+
+      Create actionable user stories from the implementation report, organizing them into individual story files with tracking mechanisms.
+
+      ## Sprint Context
+
+      - **Sprint plan directory**: {{.Args.SprintPlanDir}}
+      - **Sprint ID**: {{.Args.SprintID}}
+      - **Input files**:
+        - {{.Args.SprintPlanDir}}/IMPLEMENTATION.md (primary source)
+        - {{.Args.SprintPlanDir}}/REQUIREMENTS.md (for complexity assessment)
+        - {{.Args.SprintPlanDir}}/ARCHITECTURE.md (for architectural patterns)
+      - **Output directory**: {{.Args.SprintPlanDir}}/stories/
+      - **Output files**:
+        - {{.Args.SprintPlanDir}}/TODO.md
+        - {{.Args.SprintPlanDir}}/SPRINT_STATUS.md
+
+      ## Task Steps
+
+      ### Step 1: Read Complexity Assessment
+
+      Read {{.Args.SprintPlanDir}}/REQUIREMENTS.md to find the **Complexity Assessment** (Easy/Medium/Hard):
+
+      - This determines appropriate story count
+      - Use your complexity-driven story creation methodology
+      - DO NOT create many stories just for the sake of having many stories
+
+      ### Step 2: Analyze Implementation Report
+
+      Read {{.Args.SprintPlanDir}}/IMPLEMENTATION.md as your primary source:
+
+      - Extract component breakdown and responsibilities
+      - Identify development sequence and dependencies
+      - Note helper functions and shared utilities (implement these first)
+      - Identify vertical feature slices
+      - Review testing approach and quality criteria
+      - Follow story preparation guidance
+      - Note technical risks requiring attention
+
+      Also reference:
+
+      - {{.Args.SprintPlanDir}}/ARCHITECTURE.md for architectural patterns to follow
+      - {{.Args.SprintPlanDir}}/REQUIREMENTS.md for business context
+
+      ### Step 3: Create Stories Directory
+
+      Create directory at {{.Args.SprintPlanDir}}/stories/ if it doesn't exist.
+
+      ### Step 4: Create Individual Story Files
+
+      For each story identified in the implementation report (respecting complexity-based story count):
+
+      1. Create individual story file at {{.Args.SprintPlanDir}}/stories/{zero-padded-number}-{description}.md
+         - Use zero-padded numbering: 01, 02, ... 10, 11
+         - Use descriptive file names: `01-create-user-service.md`, not `01-story.md`
+
+      2. Apply your file organization principles:
+         - Helper functions and shared utilities first (01-XX series)
+         - Core components next (XX-XX series)
+         - Integration and feature slices last (XX-XX series)
+
+      3. Use appropriate story format (user story or technical story)
+
+      4. Include all required story sections:
+         - Clear acceptance criteria
+         - Adaptive sizing based on complexity (1-3)
+         - Testing requirements
+         - Dependencies (explicit)
+         - Technical notes and guidance
+
+      ### Step 5: Create TODO.md
+
+      Create {{.Args.SprintPlanDir}}/TODO.md using your TODO list template:
+
+      - List all stories with brief descriptions
+      - Organize by implementation sequence
+      - Document story dependencies
+      - Include summary (total stories, estimated complexity)
+
+      ### Step 6: Create SPRINT_STATUS.md
+
+      Create {{.Args.SprintPlanDir}}/SPRINT_STATUS.md:
+
+      - List all stories with checkboxes
+      - Set current phase to "Story Creation Complete"
+      - Include any relevant sprint metadata
+
+      ### Step 7: Commit All Story Files
+
+      Commit all files together with this message format:
+
+      ```
+      feat(sprint-{{.Args.SprintID}}): [Guilde] Create user stories and backlog
+      ```
+
+      Include a detailed commit body following the pattern from recent commits.
+
+      **Files to commit:**
+
+      - All story files in {{.Args.SprintPlanDir}}/stories/
+      - {{.Args.SprintPlanDir}}/TODO.md
+      - {{.Args.SprintPlanDir}}/SPRINT_STATUS.md
+
+      ## Success Criteria
+
+      - All stories created as individual files in stories/ directory
+      - Story files use zero-padded sequential naming (01-, 02-, etc.)
+      - Story file names are descriptive and meaningful
+      - Each story has clear, testable acceptance criteria
+      - Story format (user story vs technical story) matches context
+      - Story sizing adapted to complexity (1-3 scale)
+      - Dependencies explicitly documented
+      - TODO.md created with complete story list and sequence
+      - SPRINT_STATUS.md created with tracking information
+      - Stories organized in logical implementation sequence
+      - All files committed to git
+      - Stories reflect IMPLEMENTATION.md guidance and complexity assessment
+      - Ready to transition to IT Admin phase for environment setup
+
+    transitions_to:
+      - to_state: it-admin
+        reason: Stories created, ready for environment setup
+
+  # PHASE 2: IT-ADMIN - Environment setup
+  - id: it-admin
+    name: Environment Setup
+    description: Install and verify development dependencies
+    agent: tdd-05-it-admin
+    
+    models:
+      - anthropic/claude-sonnet-4-5-20250929
+
+    files:
+      - path: "{{.Args.SprintPlanDir}}/dependencies.yaml"
+        
+
+    prompt: |
+      # IT Admin Workflow Task: Environment Setup for Sprint {{.Args.SprintID}}
+
+      ## Your Task
+
+      Install and verify all development dependencies required for this sprint, creating a documented, reproducible development environment.
+
+      ## Sprint Context
+
+      - **Sprint plan directory**: {{.Args.SprintPlanDir}}
+      - **Sprint ID**: {{.Args.SprintID}}
+      - **Input file**: {{.Args.SprintPlanDir}}/dependencies.yaml
+      - **Output file**: {{.Args.SprintPlanDir}}/ENVIRONMENT.md
+
+      ## Task Steps
+
+      ### Step 1: Read Dependency Requirements
+
+      Read {{.Args.SprintPlanDir}}/dependencies.yaml to understand:
+
+      - What tools, runtimes, and frameworks need to be installed
+      - Version requirements for each dependency
+      - Any platform-specific requirements
+
+      ### Step 2: Ensure node_modules is Gitignored (if applicable)
+
+      **Important pre-installation step to prevent accidental commits:**
+
+      1. Check if package.json exists in any project directories that will be worked on
+      2. If package.json exists:
+         - Check if a .gitignore file exists in that directory
+         - If .gitignore doesn't exist, create it with node_modules entry
+         - If .gitignore exists but doesn't contain node_modules pattern, add node_modules to it
+         - This prevents accidental commits of large dependency directories before installation
+
+      ### Step 3: Install Dependencies
+
+      Using your fail-fast installation methodology:
+
+      1. For each dependency in {{.Args.SprintPlanDir}}/dependencies.yaml:
+         - Check if already installed with correct version
+         - If not installed or wrong version, install using appropriate package manager
+         - Verify installation succeeded
+
+      2. **You have sudo access** - Install anything needed
+
+      3. **If any installation fails**:
+         - Stop immediately (don't proceed to next dependency)
+         - Document the failure
+         - Create partial ENVIRONMENT.md
+         - Commit partial results
+         - End workflow with clear error message
+         - **Do NOT transition to QA Engineer phase**
+
+      ### Step 4: Verify Environment
+
+      For each successfully installed dependency:
+
+      1. Check version matches requirements (if version specified)
+      2. Verify binary is accessible in PATH
+      3. Run verification command to ensure tool works
+      4. **Record the exact path to the verified executable** using `which <tool>`
+         - This is critical for troubleshooting version conflicts later
+
+      ### Step 5: Document Environment
+
+      Create {{.Args.SprintPlanDir}}/ENVIRONMENT.md using your environment documentation template:
+
+      **Required sections:**
+
+      - Platform (OS, architecture, timestamp)
+      - Installed Dependencies table with:
+        - Tool name
+        - Version
+        - Verified Path (from `which` command)
+        - Verification Command output
+      - Verification status (overall pass/fail)
+      - Troubleshooting guidance (how to use exact paths)
+      - Notes (warnings, version conflicts, important details)
+
+      **Template structure:**
+
+      ````markdown
+      # Sprint {{.Args.SprintID}} Environment
+
+      ## Platform
+
+      - OS: [detected OS]
+      - Architecture: [detected arch]
+      - Date: [timestamp]
+
+      ## Installed Dependencies
+
+      | Tool   | Version   | Verified Path     | Verification Command |
+      | ------ | --------- | ----------------- | -------------------- |
+      | [tool] | [version] | [path from which] | [command output]     |
+
+      ## Verification
+
+      All dependencies verified and accessible in PATH.
+
+      ## Troubleshooting
+
+      If later stages have version conflicts (e.g., multiple versions in PATH),
+      use the exact paths from the "Verified Path" column above.
+
+      Example:
+
+      ```bash
+      # If 'go build' uses wrong version, use exact path:
+      /usr/local/go/bin/go build
+      ```
+      ````
+
+      ## Notes
+
+      [Any warnings, issues, or important details about version conflicts]
+
+      ```
+
+      ### Step 6: Commit Environment Documentation
+
+      Commit {{.Args.SprintPlanDir}}/ENVIRONMENT.md with this message format:
+
+      ```
+
+      feat(sprint-{{.Args.SprintID}}): [Guilde] Configure development environment
+
+      ```
+
+      Include a detailed commit body following the pattern from recent commits.
+
+      **Commit even if setup partially failed** - Preserve state for troubleshooting.
+
+      ## Success Criteria
+
+      **For successful environment setup:**
+      - All dependencies from dependencies.yaml are installed
+      - All versions verified (where specified in requirements)
+      - All tools accessible in PATH
+      - ENVIRONMENT.md exists with complete documentation
+      - Exact paths recorded for all tools
+      - Verification commands documented
+      - File committed to git
+      - Ready to transition to QA Engineer phase
+
+      **For failed environment setup:**
+      - Partial ENVIRONMENT.md documents what succeeded and what failed
+      - Failure documented with error messages
+      - Troubleshooting steps provided
+      - Partial results committed to git
+      - Workflow ends (no transition to QA Engineer phase)
+      - Clear error message explaining what needs fixing
+
+      ## Failure Handling
+
+      If ANY dependency fails to install:
+
+      1. **Stop immediately** - Use your fail-fast methodology
+      2. **Document the failure** in ENVIRONMENT.md:
+         - What was successfully installed
+         - What failed to install
+         - Complete error message
+         - Troubleshooting steps to try
+         - Relevant system information
+      3. **Commit partial ENVIRONMENT.md** - Preserve state for debugging
+      4. **End workflow with clear error message** - Don't proceed to QA phase
+      5. **Provide actionable guidance** - Help user understand what to fix
+      ```
+
+    transitions_to:
+      - to_state: qa-engineer
+        reason: Environment configured, ready for QA story enhancement
+      - to_state: end
+        reason: Environment setup failed, cannot proceed
+
+  # PHASE 3: QA ENGINEER - Enhance stories with test specifications (ping-pong with TDD)
+  - id: qa-engineer
+    name: QA Engineer (Story Enhancement)
+    description: Add test considerations and specifications to one story at a time
+    agent: tdd-06-qa-engineer
+    
+    models:
+      - anthropic/claude-sonnet-4-5-20250929
+
+    files:
+      - path: "{{.Args.SprintPlanDir}}/TODO.md"
+        
+      - path: "{{.Args.SprintPlanDir}}/REQUIREMENTS.md"
+        first_time_only: true
+      - path: "{{.Args.SprintPlanDir}}/ARCHITECTURE.md"
+        first_time_only: true
+      - path: "{{.Args.SprintPlanDir}}/IMPLEMENTATION.md"
+        first_time_only: true
+
+    prompt: |
+      # QA Engineer Workflow Task: Story Enhancement for Sprint {{.Args.SprintID}}
+
+      ## Your Task
+
+      Enhance ONE story at a time with test specifications using your ping-pong pattern methodology. Process stories sequentially from the tracking list.
+
+      ## Sprint Context
+
+      - **Sprint plan directory**: {{.Args.SprintPlanDir}}
+      - **Sprint ID**: {{.Args.SprintID}}
+      - **Tracking file**: {{.Args.SprintPlanDir}}/TODO.md
+      - **Stories directory**: {{.Args.SprintPlanDir}}/stories/
+      - **Planning documents** (read first time only):
+        - {{.Args.SprintPlanDir}}/REQUIREMENTS.md
+        - {{.Args.SprintPlanDir}}/ARCHITECTURE.md
+        - {{.Args.SprintPlanDir}}/IMPLEMENTATION.md
+
+      ## Task Steps
+
+      ### Step 1: Find Next Unchecked Story
+
+      Read {{.Args.SprintPlanDir}}/TODO.md:
+
+      1. Find the FIRST unchecked story `[ ]` in sequential order
+      2. This is the ONE story you will enhance
+      3. Note the story filename (e.g., `01-create-user-service.md`)
+
+      ### Step 2: Context Gathering (First Time Only)
+
+      **If this is your first invocation**, gather context once and cache it:
+
+      1. **Read planning documents**:
+         - {{.Args.SprintPlanDir}}/REQUIREMENTS.md for business context
+         - {{.Args.SprintPlanDir}}/ARCHITECTURE.md for technical patterns and test structure
+         - {{.Args.SprintPlanDir}}/IMPLEMENTATION.md for implementation approach and conventions
+
+      2. **Research existing test patterns**:
+         - Use Glob to find existing test files in the codebase
+         - Identify test utilities and conventions used in this project
+         - Understand project test structure and naming conventions
+         - Note test file locations (e.g., `__tests__/`, `test/`, `.test.ts` suffix)
+
+      3. **Cache this knowledge** - Don't repeat this research for subsequent stories
+
+      **If this is NOT your first invocation**, skip this step and use cached knowledge.
+
+      ### Step 3: Read Story File
+
+      Read the story file from {{.Args.SprintPlanDir}}/stories/:
+
+      1. Read complete story content
+      2. Analyze existing acceptance criteria for testability
+      3. Determine story complexity/size (1, 2, or 3)
+      4. Understand story dependencies
+      5. Identify appropriate test approach (unit, integration, e2e)
+
+      ### Step 4: Enhance Story with Test Specifications
+
+      Add QA sections to the story file using your story enhancement template:
+
+      **Required sections to add:**
+
+      - QA Considerations (testing strategy, key quality concerns)
+      - Test Specifications:
+        - BDD Scenarios (Given-When-Then format)
+        - TDD Criteria (PRIMARY guidance for TDD Engineer)
+        - Edge Cases & Error Scenarios
+        - Test Data (fixtures, mocks)
+        - Quality Metrics (coverage goals)
+
+      **Detail level** based on story complexity:
+
+      - Size 1 (Simple): Brief notes, 1-2 BDD scenarios, 2-3 unit tests, obvious edge cases
+      - Size 2 (Medium): Moderate notes, 2-4 BDD scenarios, 4-6 tests, important edge cases
+      - Size 3 (Complex): Comprehensive notes, 4+ BDD scenarios, 8+ tests, extensive edge cases
+
+      Use your graduated detail approach to match the enhancement to story complexity.
+
+      ### Step 5: Update TODO.md
+
+      Update {{.Args.SprintPlanDir}}/TODO.md:
+
+      1. Change the story checkbox from `[ ]` to `[x]`
+      2. This marks the story as QA-enhanced and ready for TDD implementation
+
+      ### Step 6: Commit Changes
+
+      Commit both files together with this message format:
+
+      ```
+      test(story-{{.Args.SprintID}}-XX): [Guilde] Add QA test specifications for [story-name]
+
+      Added QA considerations and test criteria for story XX: [story-name].
+      Detail level: [Simple/Medium/Complex] based on story size [1/2/3].
+      Defined [N] BDD scenarios and [N] TDD test cases.
+
+      🤖 Generated with [Claude Code](https://claude.com/claude-code)
+
+      Co-Authored-By: Claude <noreply@anthropic.com>
+      ```
+
+      Include a detailed commit body following the pattern from recent commits.
+
+      **Files to commit:**
+
+      - Enhanced story file: {{.Args.SprintPlanDir}}/stories/XX-story-name.md
+      - Updated tracking list: {{.Args.SprintPlanDir}}/TODO.md
+
+      **Commit both files together as atomic unit.**
+
+      ### Step 7: Route to Development (TDD Engineer)
+
+      **Always route to development phase** after enhancing a story:
+
+      - TDD Engineer will implement the story you just enhanced
+      - TDD Engineer will check if more unchecked stories exist in TODO.md
+      - If more stories exist, TDD Engineer will route back to you
+      - If no more stories exist, TDD Engineer will route to Review phase
+
+      **Do NOT self-loop** - Wait for TDD Engineer to route back to you if needed.
+
+      ## Success Criteria
+
+      Your work for this story is complete when:
+
+      - TODO.md read to identify next unchecked story in sequential order
+      - Single story taken (not multiple stories)
+      - Context gathered and cached (first time only)
+      - Story file read and analyzed for complexity
+      - Story enhanced with QA sections using your template
+      - QA detail level matches story complexity (graduated approach)
+      - BDD scenarios added in proper Given-When-Then format
+      - TDD criteria provided with specific, actionable test cases
+      - Edge cases and error scenarios documented
+      - Test data requirements specified
+      - Quality metrics defined
+      - TODO.md updated with story checked off `[x]`
+      - Both story file and TODO.md committed together
+      - Routed to Development (TDD Engineer) phase
+
+      ## Important Notes
+
+      **Process Flow:**
+
+      - You enhance ONE story at a time
+      - Take stories in sequential order from TODO.md
+      - Always route to Development after each story
+      - Development routes back to you if more stories need QA
+      - Do NOT self-loop - let Development control the ping-pong
+
+      **What You Do:**
+
+      - Define test specifications
+      - Write BDD scenarios
+      - Specify TDD test cases
+      - Identify edge cases
+      - Update TODO.md checkbox
+
+      **What You Do NOT Do:**
+
+      - Write actual test code (Development's job)
+      - Execute tests (Development's job)
+      - Process multiple stories in one invocation
+      - Self-loop to process next story
+      - Create separate test plan documents
+
+      **Ping-Pong Pattern:**
+
+      ```
+      QA (You) → Enhance 1 story → TDD Engineer
+                    ↑                    ↓
+                    └── Route back ←─────┘
+                      (if more stories)
+      ```
+
+    transitions_to:
+      - to_state: development
+        reason: Story XX QA enhancement complete, routing to TDD for implementation
+
+  # PHASE 4: DEVELOPMENT - TDD with RED-GREEN-REFACTOR cycles, one story at a time
+  - id: development
+    name: TDD Implementation
+    description: Implement stories using strict RED-GREEN-REFACTOR methodology
+    agent: tdd-07-development
+    
+    models:
+      - anthropic/claude-sonnet-4-5-20250929
+
+    files:
+      - path: "{{.Args.SprintPlanDir}}/TODO.md"
+        
+      - path: "{{.Args.SprintPlanDir}}/SPRINT_STATUS.md"
+        
+      - path: "{{.Args.SprintPlanDir}}/ENVIRONMENT.md"
+        first_time_only: true
+      - path: "{{.Args.SprintPlanDir}}/REQUIREMENTS.md"
+        first_time_only: true
+      - path: "{{.Args.SprintPlanDir}}/ARCHITECTURE.md"
+        first_time_only: true
+
+    prompt: |
+      # Development Workflow Task: TDD Implementation for Sprint {{.Args.SprintID}}
+
+      ## Your Task
+
+      Implement ONE story at a time using strict RED-GREEN-REFACTOR methodology. Work in ping-pong pattern with QA Engineer until all stories are complete.
+
+      ## Sprint Context
+
+      - **Sprint folder**: {{.Args.SprintPlanDir}}
+      - **Sprint number**: {{.Args.SprintID}}
+      - **Tracking files**:
+        - {{.Args.SprintPlanDir}}/TODO.md
+        - {{.Args.SprintPlanDir}}/SPRINT_STATUS.md
+      - **Stories directory**: {{.Args.SprintPlanDir}}/stories/
+      - **Planning documents** (read first time only):
+        - {{.Args.SprintPlanDir}}/ENVIRONMENT.md
+        - {{.Args.SprintPlanDir}}/REQUIREMENTS.md
+        - {{.Args.SprintPlanDir}}/ARCHITECTURE.md
+      - **Feedback mechanism** (if exists):
+        - Inbox: {{.Args.SprintPlanDir}}/inbox/
+        - Archive: {{.Args.SprintPlanDir}}/archive/
+        - Responses: {{.Args.SprintPlanDir}}/responses/
+
+      ## Task Steps
+
+      ### Step 1: Check for Feedback (if inbox exists)
+
+      If {{.Args.SprintPlanDir}}/inbox/ folder exists:
+
+      1. Read any feedback files in inbox
+      2. Address each piece of feedback
+      3. Move actioned feedback to {{.Args.SprintPlanDir}}/archive/
+      4. Document your response in {{.Args.SprintPlanDir}}/responses/
+
+      If inbox doesn't exist, skip this step.
+
+      ### Step 2: Story Selection
+
+      1. Read {{.Args.SprintPlanDir}}/TODO.md to find next unchecked story
+      2. Read {{.Args.SprintPlanDir}}/SPRINT_STATUS.md to verify story status
+      3. Select the ONE story you will implement
+      4. Note the story filename (e.g., `01-create-user-service.md`)
+
+      ### Step 3: Context Gathering (First Time Only)
+
+      **If this is your first invocation**, read planning documents once and cache:
+
+      1. **Environment**: {{.Args.SprintPlanDir}}/ENVIRONMENT.md
+         - Understand configured development environment
+         - Note verified tool paths for troubleshooting version conflicts
+         - All dependencies listed here are installed and verified
+
+      2. **Requirements**: {{.Args.SprintPlanDir}}/REQUIREMENTS.md
+         - Business context for the sprint
+         - Overall success criteria
+
+      3. **Architecture**: {{.Args.SprintPlanDir}}/ARCHITECTURE.md
+         - Patterns and conventions to follow
+         - Test structure and locations
+         - Integration points and existing interfaces
+
+      **Cache this knowledge** - don't re-read for subsequent stories.
+
+      **If this is NOT your first invocation**, skip this step and use cached knowledge.
+
+      ### Step 4: Story Analysis
+
+      Read the story file from {{.Args.SprintPlanDir}}/stories/:
+
+      1. Read complete story including:
+         - Acceptance criteria (defines "done")
+         - QA Considerations section
+         - Test Specifications section with:
+           - BDD Scenarios (Given-When-Then)
+           - TDD Criteria (specific test cases to write)
+           - Edge Cases & Error Scenarios
+           - Test Data requirements
+           - Quality Metrics
+
+      2. Plan your TDD approach:
+         - Identify test requirements from QA specifications
+         - Determine test strategy (unit, integration, e2e)
+         - Break down into small RED-GREEN-REFACTOR cycles
+         - Estimate number of cycles needed
+
+      ### Step 5: TDD Implementation Loop
+
+      **IMPORTANT**: The development environment has been configured by IT-Admin. All required dependencies from dependencies.yaml are installed and verified. See ENVIRONMENT.md for details.
+
+      **If tests fail due to missing dependencies**, this is an environment regression - report it but do not attempt to fix it yourself.
+
+      For **EACH acceptance criterion** in the story:
+
+      #### RED Phase - Write Failing Test First
+
+      1. Write test BEFORE any implementation code
+      2. Test should fail for the right reason (missing functionality)
+      3. Follow test patterns from ARCHITECTURE.md
+      4. Use QA Engineer's TDD Criteria as PRIMARY guidance
+      5. Cover happy path, edge cases, and error scenarios from QA specs
+      6. Run test to verify it fails as expected
+
+      #### GREEN Phase - Minimal Implementation
+
+      1. Write ONLY enough code to make the test pass
+      2. Avoid over-engineering or adding "nice to have" features
+      3. Keep focused on current test requirement
+      4. Run test to verify it passes
+      5. Run ALL tests to ensure no regressions
+
+      #### REFACTOR Phase - Improve Code Quality
+
+      1. Improve code structure while keeping tests green
+      2. Remove duplication (DRY principle)
+      3. Clarify intent through better naming
+      4. Follow existing codebase patterns from ARCHITECTURE.md
+      5. Run ALL tests to verify still passing
+
+      #### COMMIT - Atomic Commit
+
+      Create atomic commit after each complete RED-GREEN-REFACTOR cycle:
+
+      ```
+      feat(story-{{.Args.SprintID}}-XX): [Guilde] [criterion description]
+
+      [Detailed explanation of what was implemented and why]
+
+      Tests:
+      - [List of tests added/modified]
+      - [Coverage or important test scenarios]
+
+      🤖 Generated with [Claude Code](https://claude.com/claude-code)
+
+      Co-Authored-By: Claude <noreply@anthropic.com>
+      ```
+
+      Include detailed commit body following patterns from recent commits.
+
+      **Repeat** RED-GREEN-REFACTOR-COMMIT cycle until all acceptance criteria met.
+
+      ### Step 6: Story Completion
+
+      After implementing all acceptance criteria:
+
+      1. **Verify all acceptance criteria met** - Review story acceptance criteria
+      2. **Run full test suite** - Must be 100% passing
+      3. **Update TODO.md** - Check off completed story `[ ]` → `[x]`
+      4. **Update SPRINT_STATUS.md** - Check off completed story
+      5. **Commit status updates** together:
+
+      ```
+      chore(sprint-{{.Args.SprintID}}): [Guilde] Complete story XX - [story-name]
+
+      All acceptance criteria met and tested.
+      All tests passing (100%).
+      Story XX marked complete in tracking.
+
+      🤖 Generated with [Claude Code](https://claude.com/claude-code)
+
+      Co-Authored-By: Claude <noreply@anthropic.com>
+      ```
+
+      ### Step 7: Determine Next Action
+
+      Read {{.Args.SprintPlanDir}}/TODO.md after completing story:
+
+      **If more unchecked stories exist**:
+
+      - Route back to **QA Engineer** phase
+      - QA will enhance next story with test specifications
+      - QA will route back to you for implementation
+      - Continue ping-pong pattern until all stories complete
+
+      **If all stories are checked (complete)**:
+
+      1. Verify all tests pass one final time (100% success)
+      2. Verify all stories complete in TODO.md
+      3. Transition to **Review** phase for final verification
+
+      ## Success Criteria
+
+      Your work for this story is complete when:
+
+      - Feedback from inbox processed (if inbox exists)
+      - Single story selected from TODO.md
+      - Context gathered and cached (first time only)
+      - Story file read completely including QA test specifications
+      - TDD implementation loop completed for all acceptance criteria:
+        - All tests written BEFORE implementation code
+        - All tests passing (100%)
+        - Code refactored for quality
+        - Atomic commits after each RED-GREEN-REFACTOR cycle
+      - All acceptance criteria verified
+      - Full test suite passing
+      - TODO.md updated with story checked off
+      - SPRINT_STATUS.md updated with story checked off
+      - Status updates committed
+      - Routed to appropriate next phase (QA for next story, or Review if all done)
+
+      ## Important Notes
+
+      **TDD Rules (CRITICAL)**:
+
+      - ✓ ALWAYS write test BEFORE implementation
+      - ✓ NEVER skip tests (even for "simple" code)
+      - ✓ Process ONE story at a time
+      - ✓ Run tests after EVERY change
+      - ✓ Commit after EACH TDD cycle
+      - ✓ Keep cycles small and focused
+      - ✓ Update status files (TODO.md, SPRINT_STATUS.md)
+
+      **Quality Standards**:
+
+      - All tests must pass (100%)
+      - Follow existing codebase patterns from ARCHITECTURE.md
+      - Maintain code quality through refactoring
+      - Handle errors appropriately
+      - Keep functions small and focused
+
+      **What You Do**:
+
+      - Implement features through test-first development
+      - Write both tests and implementation code
+      - Follow RED-GREEN-REFACTOR cycles religiously
+      - Commit atomically after each cycle
+      - Update tracking files
+
+      **What You Do NOT Do**:
+
+      - Write implementation before tests (violates TDD)
+      - Work on multiple stories simultaneously
+      - Skip test-first approach
+      - Use interactive commands (not automatable)
+      - Commit with --no-verify (bypasses checks)
+
+      **Troubleshooting**:
+
+      - **Version conflicts**: Use exact paths from ENVIRONMENT.md
+      - **Environment regressions**: Report missing dependencies, don't fix yourself
+      - **Failing tests in RED**: Expected - test should fail before implementation
+      - **Failing tests in GREEN**: Debug why test isn't passing
+      - **Failing tests in REFACTOR**: You broke something - revert or fix
+
+      **Ping-Pong Pattern**:
+
+      ```
+      QA Engineer → Enhance story with test specs → Development (You)
+                            ↑                              ↓
+                            └──── Route back ←─────────────┘
+                                (if more stories)
+                                       ↓
+                                Review Phase
+                            (when all stories done)
+      ```
+
+    transitions_to:
+      - to_state: qa-engineer
+        reason: Story XX complete, more unchecked stories in TODO - route to QA for next story
+      - to_state: review
+        reason: All stories complete, tests passing, ready for review
+
+  # PHASE 5: REVIEW - Quality verification with feedback loop to development
+  - id: review
+    name: Quality Review
+    description: Comprehensive quality verification and approval
+    agent: tdd-08-review
+    
+    models:
+      - anthropic/claude-sonnet-4-5-20250929
+
+    files:
+      - path: "{{.Args.SprintPlanDir}}/TODO.md"
+        
+      - path: "{{.Args.SprintPlanDir}}/SPRINT_STATUS.md"
+        
+      - path: "{{.Args.SprintPlanDir}}/ENVIRONMENT.md"
+        
+      - path: "{{.Args.SprintPlanDir}}/REQUIREMENTS.md"
+        
+
+    prompt: |
+      # Review Workflow Task: Quality Verification for Sprint {{.Args.SprintID}}
+
+      ## Your Task
+
+      Perform comprehensive quality verification of completed sprint implementation using your systematic review methodology. Either approve the sprint and transition to documentation, or provide actionable feedback and return to development.
+
+      ## Sprint Context
+
+      - **Sprint folder**: {{.Args.SprintPlanDir}}
+      - **Sprint number**: {{.Args.SprintID}}
+      - **Planning documents**:
+        - {{.Args.SprintPlanDir}}/REQUIREMENTS.md
+        - {{.Args.SprintPlanDir}}/ARCHITECTURE.md
+        - {{.Args.SprintPlanDir}}/ENVIRONMENT.md
+      - **Tracking files**:
+        - {{.Args.SprintPlanDir}}/TODO.md
+        - {{.Args.SprintPlanDir}}/SPRINT_STATUS.md
+      - **Feedback mechanism** (create if needed):
+        - Inbox: {{.Args.SprintPlanDir}}/inbox/
+        - Archive: {{.Args.SprintPlanDir}}/archive/
+        - Responses: {{.Args.SprintPlanDir}}/responses/
+
+      ## Task Steps
+
+      ### Step 1: Initial Assessment
+
+      Using your comprehensive quality verification approach:
+
+      1. **Verify completion**:
+         - Read {{.Args.SprintPlanDir}}/TODO.md to verify all stories checked off
+         - Read {{.Args.SprintPlanDir}}/SPRINT_STATUS.md to verify sprint phase
+         - Confirm all stories marked complete
+
+      2. **Gather context**:
+         - Read {{.Args.SprintPlanDir}}/REQUIREMENTS.md to understand acceptance criteria
+         - Read {{.Args.SprintPlanDir}}/ARCHITECTURE.md to understand design patterns
+         - Read {{.Args.SprintPlanDir}}/ENVIRONMENT.md to understand configured tools
+         - Run `git diff` to see all changes made during sprint
+
+      ### Step 2: Test Execution
+
+      **IMPORTANT**: The development environment was configured by IT-Admin. All required dependencies are documented in {{.Args.SprintPlanDir}}/ENVIRONMENT.md with exact verified paths.
+
+      Using your test-first validation approach:
+
+      1. **Run complete test suite**:
+         - Execute ALL tests (unit, integration, functional, e2e)
+         - Do NOT skip any test categories
+         - If version conflicts occur, use exact paths from ENVIRONMENT.md
+         - Verify 100% test pass rate (no failures, no skips)
+
+      2. **Assess test quality**:
+         - Check tests are meaningful, not just smoke tests
+         - Verify edge cases and error scenarios covered
+         - Confirm tests follow project conventions
+         - Validate test names clearly describe behavior
+
+      3. **Measure coverage**:
+         - Generate code coverage report
+         - Validate coverage meets project standards
+         - Identify any untested code paths
+
+      ### Step 3: Code Quality Review
+
+      Using your pattern adherence methodology:
+
+      1. **Static analysis**:
+         - Run linters and static analyzers
+         - Check for code duplication
+         - Validate naming conventions
+         - Assess function size and complexity
+
+      2. **Pattern adherence**:
+         - Compare against existing codebase patterns from ARCHITECTURE.md
+         - Verify architectural consistency
+         - Check proper separation of concerns
+
+      3. **Documentation**:
+         - Verify README updated if needed
+         - Check API documentation is current
+         - Confirm complex logic has explanatory comments
+
+      ### Step 4: Security and Standards
+
+      Using your security validation approach:
+
+      1. **Security checks**:
+         - Run security vulnerability scans
+         - Check for common security issues (OWASP Top 10)
+         - Validate input validation and sanitization
+         - Review authentication/authorization if applicable
+
+      2. **Standards compliance**:
+         - Verify code follows project conventions
+         - Check commit messages follow patterns (last 15 commits)
+         - Confirm no bypassed quality gates (--no-verify)
+
+      ### Step 5: Regression Check
+
+      Using your historical analysis approach:
+
+      1. Look at commits from last 3 months touching changed files
+      2. Identify previously fixed bugs in modified areas
+      3. Verify no bugs reintroduced
+      4. Check for unintended side effects
+      5. Validate backward compatibility maintained
+
+      ### Step 6: Requirements Validation
+
+      Using your acceptance criteria verification approach:
+
+      1. Compare implementation against {{.Args.SprintPlanDir}}/REQUIREMENTS.md
+      2. Verify ALL acceptance criteria demonstrably met
+      3. Check IN-scope items completed
+      4. Verify OUT-of-scope items not included
+      5. Validate business value delivered
+
+      ### Step 7: Decision and Next Actions
+
+      Based on your objective criteria:
+
+      #### If ALL Approval Criteria Met → APPROVE
+
+      Using your approval path methodology:
+
+      1. **Create approval document** at {{.Args.SprintPlanDir}}/APPROVAL.md:
+         - Document comprehensive verification results
+         - Include test execution summary (pass rate, coverage)
+         - List all validated acceptance criteria
+         - Attach evidence (test output, linter results, security scan)
+         - Confirm no regressions detected
+         - Summarize code quality assessment
+
+      2. **Update sprint status**:
+         - Update {{.Args.SprintPlanDir}}/SPRINT_STATUS.md
+         - Set phase to "Approved"
+         - Add approval timestamp
+
+      3. **Commit approval**:
+
+      ```
+      feat(sprint-{{.Args.SprintID}}): [Guilde] Sprint review approved
+
+      All quality gates passed:
+      - Tests: 100% pass rate, [X]% coverage
+      - Code quality: Linter clean, patterns followed
+      - Security: No vulnerabilities detected
+      - Requirements: All acceptance criteria verified
+      - Regressions: None detected
+
+      Sprint approved for documentation phase.
+
+      🤖 Generated with [Claude Code](https://claude.com/claude-code)
+
+      Co-Authored-By: Claude <noreply@anthropic.com>
+      ```
+
+      4. **Transition to Documentation phase**
+
+      #### If ANY Criteria NOT Met → REQUEST CHANGES
+
+      Using your feedback path methodology:
+
+      1. **Create feedback structure** (if not exists):
+         - Create {{.Args.SprintPlanDir}}/inbox/ folder
+         - Create {{.Args.SprintPlanDir}}/archive/ folder
+         - Create {{.Args.SprintPlanDir}}/responses/ folder
+
+      2. **Write feedback files** to inbox folder using your feedback structure template:
+         - One file per issue category (e.g., `test-failures.md`, `security-concerns.md`, `code-quality.md`)
+         - Use clear, descriptive filenames
+         - Include all required sections: Issue Summary, Severity, Details, Suggested Fix, Acceptance Criteria
+         - Provide specific file paths and line numbers
+         - Categorize by severity (blocking, high, medium, low)
+         - Offer concrete fix suggestions
+
+      3. **Update sprint status**:
+         - Update {{.Args.SprintPlanDir}}/SPRINT_STATUS.md
+         - Set phase to "Review Feedback"
+         - Reference feedback files in inbox folder
+
+      4. **Commit feedback**:
+
+      ```
+      feat(sprint-{{.Args.SprintID}}): [Guilde] Review feedback - changes required
+
+      Issues found requiring attention:
+      - [Category 1]: [Brief description]
+      - [Category 2]: [Brief description]
+      - [Category 3]: [Brief description]
+
+      Detailed feedback provided in inbox folder.
+      See inbox/ for specific issues and acceptance criteria.
+
+      🤖 Generated with [Claude Code](https://claude.com/claude-code)
+
+      Co-Authored-By: Claude <noreply@anthropic.com>
+      ```
+
+      5. **Transition back to Development phase** for issue resolution
+
+      ## Success Criteria
+
+      **For approval (all must be met)**:
+
+      - All tests pass (100% pass rate)
+      - Code coverage meets project standards
+      - No high/medium severity issues found
+      - No security vulnerabilities detected
+      - All acceptance criteria from REQUIREMENTS.md verified
+      - No regressions detected in historical analysis
+      - Code quality standards met (linters pass, patterns followed)
+      - Documentation complete and current
+      - APPROVAL.md created with comprehensive evidence
+      - SPRINT_STATUS.md updated to "Approved"
+      - Approval committed to git
+      - Transitioned to Documentation phase
+
+      **For feedback (when any criteria not met)**:
+
+      - Specific issues documented in feedback files
+      - Feedback files created in inbox folder
+      - Each feedback file uses proper structure
+      - Issues categorized by severity
+      - File paths and line numbers provided
+      - Concrete fix suggestions included
+      - Clear acceptance criteria defined
+      - SPRINT_STATUS.md updated to "Review Feedback"
+      - Feedback committed to git
+      - Transitioned back to Development phase
+
+      ## Important Notes
+
+      **Approval Criteria (ALL required)**:
+
+      - ✓ All tests pass (100% pass rate)
+      - ✓ Code coverage meets standards
+      - ✓ No high/medium severity issues
+      - ✓ No security vulnerabilities
+      - ✓ All acceptance criteria verified
+      - ✓ No regressions detected
+      - ✓ Code quality standards met
+      - ✓ Documentation complete
+
+      **What You Do**:
+
+      - Verify quality that was built in throughout the process
+      - Run complete test suite and assess test quality
+      - Review code against existing patterns and standards
+      - Check for security vulnerabilities and compliance
+      - Validate all acceptance criteria met
+      - Provide actionable feedback when issues found
+      - Make go/no-go decision based on objective metrics
+
+      **What You Do NOT Do**:
+
+      - Fix issues yourself (development's responsibility)
+      - Approve if ANY tests fail (non-negotiable)
+      - Skip security checks or regression analysis
+      - Rush through review to meet deadlines
+      - Lower standards or make exceptions
+      - Use interactive commands (not automatable)
+      - Commit with --no-verify (bypasses checks)
+
+      **Troubleshooting**:
+
+      - **Version conflicts**: Use exact paths from {{.Args.SprintPlanDir}}/ENVIRONMENT.md
+      - **Test failures**: Document in feedback, provide reproduction steps, suggest fixes
+      - **Environment regressions**: Report missing dependencies clearly
+      - **Ambiguous requirements**: Request clarification, don't make business decisions
+
+      **Review Philosophy**:
+
+      - Quality was built in (shift-left), you verify it
+      - Base decisions on objective metrics, not opinions
+      - Be thorough but efficient - focus on significant issues
+      - Provide constructive, actionable feedback
+      - Respect the work done while maintaining standards
+      - Enable quick resolution with clear acceptance criteria
+
+      **Feedback Loop Pattern**:
+
+      ```
+      Review (You) → Find Issues → Create Feedback in inbox/
+                    ↑                         ↓
+                    └──── Verify Fixes ←── Development
+                        (feedback resolved,
+                         moved to archive/,
+                         responses in responses/)
+      ```
+
+    transitions_to:
+      - to_state: development
+        reason: Issues found, returning to development with feedback
+      - to_state: documentation
+        reason: Review approved, ready for documentation updates
+
+  # PHASE 6: DOCUMENTATION - Update user-facing docs if needed
+  - id: documentation
+    name: Documentation Update
+    description: Update existing documentation only if material changes affect usage
+    agent: tdd-09-documentation
+    
+    models:
+      - anthropic/claude-sonnet-4-5-20250929
+
+    files:
+      - path: "{{.Args.SprintPlanDir}}/REQUIREMENTS.md"
+        
+
+    prompt: |
+      # Documentation Workflow Task: Documentation Review for Sprint {{.Args.SprintID}}
+
+      ## Your Task
+
+      Assess whether sprint changes require documentation updates using your impact assessment methodology. If needed, make minimal updates to existing project documentation. Complete the sprint by updating status and cleaning up sprint planning files.
+
+      ## Sprint Context
+
+      - **Sprint folder**: {{.Args.SprintPlanDir}}
+      - **Sprint number**: {{.Args.SprintID}}
+      - **Sprint plan file**: {{.Args.SprintPlanPath}}
+      - **Planning documents**:
+        - {{.Args.SprintPlanDir}}/REQUIREMENTS.md
+        - {{.Args.SprintPlanDir}}/APPROVAL.md
+      - **Status file**: {{.Args.SprintPlanDir}}/SPRINT_STATUS.md
+      - **Project documentation** (if they exist):
+        - README.md
+        - docs/ directory
+        - API documentation files
+
+      ## Task Steps
+
+      ### Step 1: Assess Documentation Need
+
+      Using your three-question assessment methodology:
+
+      1. **Review what changed**:
+         - Read {{.Args.SprintPlanDir}}/REQUIREMENTS.md to understand what was built
+         - Run `git diff` to see actual code changes
+         - Read {{.Args.SprintPlanDir}}/APPROVAL.md to see what was approved
+
+      2. **Apply three-question assessment**:
+         - **What changed?** (features, APIs, configuration, etc.)
+         - **Who's affected?** (end users, API consumers, operators, or just internal code?)
+         - **Does this change how they interact with the system?** (interface, behavior, configuration)
+
+      3. **Make decision**:
+         - If answer to question 3 is **NO** → Skip to Step 3 (most common outcome)
+         - If answer to question 3 is **YES** → Continue to Step 2
+
+      **IMPORTANT**: It is **completely normal** for most sprints to need NO documentation updates. Internal refactoring, bug fixes, and performance improvements typically don't require doc changes.
+
+      ### Step 2: Update Documentation (If Needed)
+
+      **Only perform this step if Step 1 determined updates are needed.**
+
+      Using your minimal update principles:
+
+      1. **Find existing documentation**:
+         - Locate README.md (root or docs/)
+         - Check for docs/ directory
+         - Identify affected documentation files
+         - **DO NOT** look at sprint-specific docs in {{.Args.SprintPlanDir}}
+
+      2. **Make minimal updates**:
+         - Update ONLY affected sections
+         - Change ONLY what's necessary
+         - Preserve existing structure and style
+         - Focus on user-facing changes only
+         - Verify examples work before documenting
+
+      3. **Commit documentation changes**:
+
+      ```
+      docs(sprint-{{.Args.SprintID}}): [Guilde] Update [specific file] for [specific change]
+
+      Updated documentation to reflect [specific user-facing change]:
+      - [Specific section updated and why]
+      - [Another section updated and why]
+
+      Changed sections:
+      - [File path]: [What changed]
+
+      🤖 Generated with [Claude Code](https://claude.com/claude-code)
+
+      Co-Authored-By: Claude <noreply@anthropic.com>
+      ```
+
+      ### Step 3: Update Sprint Status and Cleanup
+
+      **Always perform this step regardless of whether docs were updated.**
+
+      1. **Update sprint status**:
+         - Update {{.Args.SprintPlanDir}}/SPRINT_STATUS.md
+         - Set phase to "Documentation Complete"
+         - Add completion timestamp
+
+      2. **Commit status update**:
+
+      ```
+      feat(sprint-{{.Args.SprintID}}): [Guilde] Complete documentation phase
+
+      Documentation phase complete.
+      [If docs updated: Updated project documentation for user-facing changes]
+      [If no docs needed: No documentation updates required - internal changes only]
+
+      Sprint {{.Args.SprintID}} workflow complete.
+
+      🤖 Generated with [Claude Code](https://claude.com/claude-code)
+
+      Co-Authored-By: Claude <noreply@anthropic.com>
+      ```
+
+      3. **Remove intermediate sprint files from git**:
+         - Run: `git rm -r --cached {{.Args.SprintPlanDir}}/`
+         - Run: `git add -f {{.Args.SprintPlanPath}}`
+         - This removes all sprint directory files from git except the sprint plan file
+         - The files remain visible in PR history but won't be in the final merged state
+
+      4. **Commit cleanup**:
+
+      ```
+      chore(sprint-{{.Args.SprintID}}): [Guilde] Remove intermediate sprint files from repository
+
+      Removed intermediate planning files from git tracking.
+      Sprint plan file retained at {{.Args.SprintPlanPath}}.
+
+      Files remain in PR history for review but removed from final merge.
+      This keeps the repository clean while preserving sprint documentation.
+
+      🤖 Generated with [Claude Code](https://claude.com/claude-code)
+
+      Co-Authored-By: Claude <noreply@anthropic.com>
+      ```
+
+      5. **Transition to end state** (sprint workflow complete)
+
+      ## Success Criteria
+
+      **Assessment completed**:
+
+      - REQUIREMENTS.md reviewed to understand changes
+      - Git diff examined to see actual code changes
+      - APPROVAL.md reviewed to understand what was approved
+      - Three-question assessment applied
+      - Decision made: docs needed or not needed
+
+      **If documentation updates needed**:
+
+      - Existing project-level documentation identified
+      - Minimal updates made to affected sections only
+      - No new documentation files created
+      - Updates preserve existing structure and style
+      - Examples verified to work
+      - Documentation changes committed
+
+      **Sprint completion (always required)**:
+
+      - SPRINT_STATUS.md updated to "Documentation Complete"
+      - Status update committed
+      - Intermediate sprint files removed from git (except sprint plan file)
+      - Cleanup committed
+      - Sprint workflow transitioned to end state
+
+      ## Important Notes
+
+      **Assessment Guidelines**:
+
+      - Default answer should be NO (most common)
+      - Only update docs for material user-facing changes
+      - Internal refactoring → NO docs needed
+      - Bug fixes without API changes → NO docs needed
+      - Performance improvements → NO docs needed
+      - New features or API changes → May need docs
+
+      **What You Do**:
+
+      - Assess documentation need using three-question methodology
+      - Make minimal updates to existing project docs if needed
+      - Update sprint status to complete
+      - Remove intermediate sprint files from git
+      - Keep sprint plan file for reference
+
+      **What You Do NOT Do**:
+
+      - Create new documentation files (use existing only)
+      - Update sprint-specific docs in {{.Args.SprintPlanDir}}
+      - Rewrite sections unnecessarily
+      - Add "nice to have" content
+      - Document internal implementation details
+      - Update when in doubt (default to NO)
+      - Use interactive commands (not automatable)
+      - Commit with --no-verify (bypasses checks)
+
+      **Common Outcomes**:
+
+      **Most Common** (70-80% of sprints):
+
+      - Assessment: No documentation updates needed
+      - Action: Skip Step 2, proceed to Step 3
+      - Commit: Status update + cleanup only
+      - Rationale: Internal changes don't affect user-facing interfaces
+
+      **Less Common** (20-30% of sprints):
+
+      - Assessment: Documentation updates needed
+      - Action: Complete all steps including Step 2
+      - Commit: Doc updates + status update + cleanup
+      - Rationale: User-facing changes require doc updates
+
+      **Documentation Philosophy**:
+
+      - Most sprints don't need doc updates (this is normal and good)
+      - Focus on material user-facing changes only
+      - Minimal updates are better than comprehensive rewrites
+      - Less documentation = less maintenance burden
+      - When in doubt, don't update
+
+      **File Management**:
+
+      - Sprint plan file ({{.Args.SprintPlanPath}}) is retained in git
+      - All other sprint directory files removed from git
+      - Files remain in PR history for review
+      - Keeps repository clean while preserving audit trail
+
+    transitions_to:
+      - to_state: end
+        reason: Documentation review complete, sprint finished
+
